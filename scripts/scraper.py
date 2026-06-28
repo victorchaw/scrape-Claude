@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
+import re
 import urllib.parse
 from pathlib import Path
 
@@ -109,6 +111,32 @@ def download_page_assets(soup: BeautifulSoup, base_url: str) -> None:
 # Link extraction
 # ---------------------------------------------------------------------------
 
+def extract_slugs_from_script(soup: BeautifulSoup, base_url: str) -> list[str]:
+    """
+    Parse lesson URLs from the inline chapters JS array.
+    The root page embeds all lesson slugs as:
+        const chapters = [{..., "lessons": [{"slug": "01-boot-sequence", ...}]}]
+    Returns list of absolute lesson URLs.
+    """
+    for script in soup.find_all("script"):
+        text = script.string or ""
+        match = re.search(r"const chapters\s*=\s*(\[.*?\]);", text, re.DOTALL)
+        if match:
+            try:
+                chapters = json.loads(match.group(1))
+                urls = []
+                for chapter in chapters:
+                    for lesson in chapter.get("lessons", []):
+                        slug = lesson.get("slug", "")
+                        if slug:
+                            urls.append(f"https://www.markdown.engineering/learn-claude-code/{slug}/")
+                logging.info("Extracted %d lesson URLs from chapters script", len(urls))
+                return urls
+            except json.JSONDecodeError as exc:
+                logging.warning("Failed to parse chapters JSON: %s", exc)
+    return []
+
+
 def extract_internal_links(soup: BeautifulSoup, base_url: str) -> list[str]:
     """
     Return deduplicated absolute URLs that are under TARGET_PREFIX
@@ -145,12 +173,16 @@ def extract_internal_links(soup: BeautifulSoup, base_url: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 async def handle_js_gate(page) -> None:
-    """Dismiss the 'press any key' splash screen if present."""
+    """Dismiss the 'press any key' boot screen and wait for course hub to render."""
     try:
+        # Simulate keypress to dismiss boot animation
         await page.keyboard.press("Space")
+        # Wait for the course hub to become visible (boot animation completes)
+        await page.wait_for_selector("#course-hub", state="visible", timeout=20_000)
         await page.wait_for_load_state("networkidle", timeout=15_000)
+        logging.info("Boot animation dismissed, course hub visible")
     except Exception as exc:  # noqa: BLE001
-        logging.debug("JS gate handling: %s", exc)
+        logging.debug("JS gate handling (non-fatal): %s", exc)
 
 
 async def navigate_and_save(page, url: str) -> str | None:
@@ -216,7 +248,11 @@ async def crawl(root_url: str) -> None:
         download_page_assets(soup, root_url)
 
         # --- Step 4: Collect links ---
-        links = extract_internal_links(soup, root_url)
+        # Primary: extract lesson slugs from inline chapters JS array
+        links = extract_slugs_from_script(soup, root_url)
+        if not links:
+            # Fallback: scan <a href> DOM links (for fully rendered pages)
+            links = extract_internal_links(soup, root_url)
         logging.info("Found %d internal links to crawl", len(links))
 
         # --- Step 5: Crawl each link ---

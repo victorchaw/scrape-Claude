@@ -277,14 +277,18 @@ def load_metadata() -> list[dict]:
         print(f"ERROR: metadata.json is not valid JSON: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    if not isinstance(data, list):
-        # Some versions wrap pages in a dict
-        if isinstance(data, dict):
-            pages = data.get("pages", list(data.values()))
-        else:
-            pages = []
-    else:
+    if isinstance(data, dict):
+        # Keys are relative paths like "learn-claude-code/01-boot-sequence"
+        # Inject as url field so downstream functions can build links
+        pages = []
+        for path_key, meta in data.items():
+            entry = dict(meta)
+            entry["url"] = "/" + path_key.strip("/") + "/"
+            pages.append(entry)
+    elif isinstance(data, list):
         pages = data
+    else:
+        pages = []
 
     return pages
 
@@ -385,8 +389,13 @@ def extract_css_links(soup: BeautifulSoup, depth_prefix: str) -> str:
             else:
                 # Keep original if we can't determine filename
                 lines.append(f'  <link rel="stylesheet" href="{href}">')
+        elif href.startswith("/"):
+            # Server-relative path — extract filename and rewrite to local assets/
+            filename = Path(href).name
+            if filename and filename.endswith(".css"):
+                lines.append(f'  <link rel="stylesheet" href="{depth_prefix}assets/{filename}">')
+            # Skip non-CSS server-relative links (favicons, etc.)
         elif href:
-            # Already relative — keep as-is (could be a local asset ref in raw HTML)
             lines.append(f'  <link rel="stylesheet" href="{href}">')
     return "\n".join(lines)
 
