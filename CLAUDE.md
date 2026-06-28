@@ -49,5 +49,18 @@ scrape-Claude/
 3. `scripts/to_html.py` → generate enhanced HTML
 4. `scripts/build_readme.py` → generate `README.md` with mermaid
 
+## Current Status (2026-06-28)
+All 4 scripts implemented and working. 51 pages cloned offline successfully.
+- Issues #1–#5 closed via merged PRs.
+- Issue #6 (QA) still open — acceptance checklist not formally run yet.
+- `output/html/` = pixel-perfect offline clone of the site.
+- Browse: `python3 -m http.server 8765 --directory output/html`
+
+## Next Tasks
+1. Run QA checklist (`docs/ACCEPTANCE.md`) and close Issue #6.
+2. Test internal navigation links between lesson pages work offline.
+3. Verify index page boot animation still functions offline.
+4. Optional: add `--force` flag to scraper to re-scrape existing pages.
+
 ## Acceptance Gate
 Run `docs/ACCEPTANCE.md` checklist before marking any task done.
