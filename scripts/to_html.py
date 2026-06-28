@@ -49,11 +49,15 @@ HTML_SHELL = """\
   <link rel="stylesheet" href="{depth_prefix}assets/custom.css">
 </head>
 <body class="scrape-layout">
+  <button id="scrape-toggle" onclick="document.querySelector('.scrape-sidebar').classList.toggle('open')">☰ LESSONS</button>
   <nav class="scrape-sidebar">
-    <div class="scrape-sidebar-header">Learn Claude Code</div>
+    <div class="scrape-sidebar-header">
+      <span>COURSE INDEX</span>
+      <button id="scrape-close" onclick="document.querySelector('.scrape-sidebar').classList.remove('open')">✕</button>
+    </div>
     {sidebar_nav_links}
     <div class="scrape-search">
-      <input type="text" id="scrape-search-input" placeholder="Search..." />
+      <input type="text" id="scrape-search-input" placeholder="Search lessons..." />
       <ul id="scrape-search-results"></ul>
     </div>
   </nav>
@@ -65,7 +69,11 @@ HTML_SHELL = """\
     </div>
   </main>
   <script>
-    // Client-side search using search-index.json
+    // Close sidebar when clicking backdrop
+    document.querySelector('.scrape-sidebar').addEventListener('click', function(e) {{
+      if (e.target === this) this.classList.remove('open');
+    }});
+    // Client-side search
     fetch('{depth_prefix}search-index.json').then(r=>r.json()).then(idx=>{{
       document.getElementById('scrape-search-input').addEventListener('input',function(){{
         const q=this.value.toLowerCase();
@@ -83,179 +91,7 @@ HTML_SHELL = """\
 # Custom CSS
 # ---------------------------------------------------------------------------
 
-CUSTOM_CSS = """\
-/* scrape-Claude custom layout — sidebar + content shell */
-
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-body.scrape-layout {
-  display: flex;
-  flex-direction: row;
-  height: 100vh;
-  margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #1a1a1a;
-}
-
-/* Sidebar */
-.scrape-sidebar {
-  width: 280px;
-  min-width: 280px;
-  overflow-y: auto;
-  background: #f8f9fa;
-  padding: 1rem;
-  border-right: 1px solid #e0e0e0;
-  flex-shrink: 0;
-}
-
-.scrape-sidebar-header {
-  font-weight: 700;
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #d0d0d0;
-  color: #111;
-}
-
-.scrape-sidebar nav ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.scrape-sidebar nav ul li {
-  margin: 0;
-}
-
-.scrape-sidebar nav ul li a {
-  display: block;
-  padding: 0.3rem 0.5rem;
-  color: #333;
-  text-decoration: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  transition: background 0.15s;
-}
-
-.scrape-sidebar nav ul li a:hover {
-  background: #e9ecef;
-  color: #000;
-}
-
-.scrape-sidebar nav ul li a.active {
-  background: #dee2e6;
-  font-weight: 600;
-  color: #000;
-}
-
-/* Search */
-.scrape-search {
-  margin-top: 1.5rem;
-  border-top: 1px solid #d0d0d0;
-  padding-top: 1rem;
-}
-
-#scrape-search-input {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  margin-top: 0.25rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-#scrape-search-input:focus {
-  border-color: #666;
-}
-
-#scrape-search-results {
-  list-style: none;
-  padding: 0;
-  margin: 0.5rem 0 0;
-}
-
-#scrape-search-results li {
-  border-bottom: 1px solid #eee;
-}
-
-#scrape-search-results li a {
-  display: block;
-  padding: 0.35rem 0.25rem;
-  color: inherit;
-  text-decoration: none;
-  font-size: 0.85rem;
-}
-
-#scrape-search-results li a:hover {
-  text-decoration: underline;
-}
-
-/* Main content */
-.scrape-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-  max-width: 900px;
-  line-height: 1.7;
-}
-
-/* Prev / Next navigation */
-.scrape-nav-buttons {
-  display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
-}
-
-.scrape-nav-buttons a {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  text-decoration: none;
-  color: #333;
-  font-size: 0.9rem;
-  background: #fff;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.scrape-nav-buttons a:hover {
-  background: #f0f0f0;
-  border-color: #999;
-}
-
-.scrape-nav-buttons a.prev::before {
-  content: "← ";
-}
-
-.scrape-nav-buttons a.next::after {
-  content: " →";
-}
-
-/* Responsive: collapse sidebar on narrow screens */
-@media (max-width: 700px) {
-  body.scrape-layout {
-    flex-direction: column;
-    height: auto;
-  }
-  .scrape-sidebar {
-    width: 100%;
-    min-width: unset;
-    border-right: none;
-    border-bottom: 1px solid #e0e0e0;
-  }
-  .scrape-content {
-    max-width: 100%;
-  }
-}
-"""
+CUSTOM_CSS = None  # written only if assets/custom.css does not exist
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -588,9 +424,12 @@ def main() -> None:
     HTML_DIR.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Write custom.css
-    CUSTOM_CSS_FILE.write_text(CUSTOM_CSS, encoding="utf-8")
-    print(f"  Wrote {CUSTOM_CSS_FILE}")
+    # Write custom.css only if it doesn't already exist (don't overwrite edits)
+    if not CUSTOM_CSS_FILE.exists():
+        CUSTOM_CSS_FILE.write_text("/* add CSS here */\n", encoding="utf-8")
+        print(f"  Wrote {CUSTOM_CSS_FILE}")
+    else:
+        print(f"  Using existing {CUSTOM_CSS_FILE}")
 
     # Process each raw file
     processed = 0
