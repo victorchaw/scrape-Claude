@@ -30,7 +30,7 @@ from tqdm import tqdm
 ROOT = Path(__file__).parent.parent
 RAW_DIR = ROOT / "output" / "raw"
 HTML_DIR = ROOT / "output" / "html"
-ASSETS_DIR = ROOT / "assets"
+ASSETS_DIR = HTML_DIR / "assets"
 
 TARGET_HOST = "www.markdown.engineering"
 BASE_URL = f"https://{TARGET_HOST}"
@@ -119,6 +119,16 @@ def internal_url_to_local(url: str, prefix: str) -> str:
 # ---------------------------------------------------------------------------
 # Per-page processing
 # ---------------------------------------------------------------------------
+
+def fix_mermaid_init(soup: BeautifulSoup) -> None:
+    """Guard bare mermaid.initialize() calls so offline CDN failure doesn't kill quiz JS."""
+    for script in soup.find_all("script"):
+        if script.string and "mermaid.initialize(" in script.string:
+            script.string = script.string.replace(
+                "mermaid.initialize(",
+                "window.mermaid && mermaid.initialize("
+            )
+
 
 def remove_boot_animation(soup: BeautifulSoup) -> None:
     """
@@ -247,6 +257,9 @@ def process_file(raw_file: Path) -> bool:
     # Lesson pages only: strip boot animation
     if not is_index_page(raw_file):
         remove_boot_animation(soup)
+
+    # Guard mermaid.initialize() so CDN failure doesn't kill quiz JS
+    fix_mermaid_init(soup)
 
     # Rewrite all asset + internal link URLs
     rewrite_assets(soup, prefix, BASE_URL)
