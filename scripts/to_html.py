@@ -239,6 +239,30 @@ def rewrite_assets(soup: BeautifulSoup, prefix: str, base_url: str) -> None:
         tag["style"] = re.sub(r"url\(([^)]+)\)", replace_url, style)
 
 
+def auto_skip_boot_screen(soup: BeautifulSoup) -> None:
+    """
+    On the index page: patch the boot JS so it auto-advances after the
+    animation completes instead of waiting for a keypress/click.
+    """
+    source_root = soup.find(id="source-root")
+    if not source_root or not isinstance(source_root, Tag):
+        return
+    for script in source_root.find_all("script"):
+        text = script.string or ""
+        if "boot-screen" not in text:
+            continue
+        # Replace the event-listener block with a direct begin() call
+        patched = re.sub(
+            r"setTimeout\s*\(\s*\(\s*\)\s*=>\s*\{[^}]*document\.addEventListener\(['\"]keydown['\"][^}]*\}[^}]*\}[^}]*\}\s*\)\s*,\s*\d+\s*\)\s*;",
+            "begin();",
+            text,
+            flags=re.S,
+        )
+        if patched != text:
+            script.string = patched
+            return
+
+
 def process_file(raw_file: Path) -> bool:
     rel = raw_file.relative_to(RAW_DIR)
     html_out = HTML_DIR / rel
@@ -254,8 +278,10 @@ def process_file(raw_file: Path) -> bool:
     prefix = depth_prefix_for(html_out)
     base_url = BASE_URL + "/" + str(rel.parent).replace("\\", "/") + "/"
 
-    # Lesson pages only: strip boot animation
-    if not is_index_page(raw_file):
+    if is_index_page(raw_file):
+        auto_skip_boot_screen(soup)
+    else:
+        # Lesson pages only: strip boot animation
         remove_boot_animation(soup)
 
     # Guard mermaid.initialize() so CDN failure doesn't kill quiz JS
